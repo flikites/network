@@ -1,6 +1,6 @@
 {
   "name": "streamr-client",
-  "version": "8.5.5",
+  "version": "8.5.5-nolit.1",
   "description": "JavaScript client library for Streamr",
   "private": true,
   "repository": {

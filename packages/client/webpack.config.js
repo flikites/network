@@ -118,7 +118,10 @@ module.exports = (env, argv) => {
                 // swap out ServerPersistence for BrowserPersistence
                 [path.resolve('./src/utils/persistence/ServerPersistence.ts')]: (
                     path.resolve('./src/utils/persistence/BrowserPersistence.ts')
-                )
+                ),
+                '@lit-protocol/core': false,
+                '@lit-protocol/uint8arrays': false,
+                'lit-siwe': false
             },
             fallback: {
                 module: false,
