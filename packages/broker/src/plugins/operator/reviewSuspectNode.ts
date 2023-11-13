@@ -67,7 +67,8 @@ export const reviewSuspectNode = async ({
     const timeUntilVoteInMs = ((votingPeriod.startTime + votingPeriod.endTime) / 2) - Date.now()
     logger.debug('Schedule voting on flag', { timeUntilVoteInMs })
     setAbortableTimeout(async () => {
-        const kick = !result.getResultsImmediately()
+        const results = result.getResultsImmediately()
+        const kick = results.filter((b) => b).length <= results.length / 2
         logger.info('Vote on flag', { sponsorshipAddress, targetOperator, kick })
         await contractFacade.voteOnFlag(sponsorshipAddress, targetOperator, kick)
     }, timeUntilVoteInMs, abortSignal)

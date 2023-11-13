@@ -6,6 +6,7 @@ import { findTarget } from './inspectionUtils'
 import { ContractFacade } from './ContractFacade'
 import { CreateOperatorFleetStateFn } from './OperatorFleetState'
 import { inspectOverTime } from './inspectOverTime'
+import { identity } from 'lodash'
 
 const logger = new Logger(module)
 
@@ -41,7 +42,7 @@ export async function inspectRandomNode(
     })
 
     const pass = await result.waitForResults()
-    if (!pass) {
+    if (pass.some(identity)) {
         logger.info('Raise flag', { target })
         await contractFacade.flag(
             target.sponsorshipAddress,
@@ -49,6 +50,6 @@ export async function inspectRandomNode(
             StreamPartIDUtils.getStreamPartition(target.streamPart)
         )
     } else {
-        logger.debug('Inspection passed (not raising flag)', { target })
+        logger.info('Not raising flag', { target })
     }
 }

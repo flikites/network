@@ -26,8 +26,8 @@ interface InspectOverTimeOpts {
 }
 
 export interface InspectionOverTimeResult {
-    getResultsImmediately: () => boolean
-    waitForResults: () => Promise<boolean>
+    getResultsImmediately: () => boolean[]
+    waitForResults: () => Promise<boolean[]>
 }
 
 export function inspectOverTime(opts: InspectOverTimeOpts): InspectionOverTimeResult {
@@ -48,7 +48,7 @@ export function inspectOverTime(opts: InspectOverTimeOpts): InspectionOverTimeRe
 class InspectionOverTimeTask {
     private readonly target: Target
     private readonly streamrClient: StreamrClient
-    private readonly fleetState: OperatorFleetState
+    private readonly createOperatorFleetState: CreateOperatorFleetStateFn
     private readonly getRedundancyFactor: (operatorContractAddress: EthereumAddress) => Promise<number | undefined>
     private readonly sleepTimeInMsBeforeFirstInspection: number
     private readonly heartbeatTimeoutInMs: number
@@ -58,6 +58,7 @@ class InspectionOverTimeTask {
     private readonly findNodesForTargetGivenFleetStateFn: FindNodesForTargetGivenFleetStateFn
     private readonly inspectTargetFn: InspectTargetFn
 
+    private fleetState?: OperatorFleetState
     private readonly inspectionResults = new Array<boolean>()
     private readonly abortController = new AbortController()
     private readonly doneGate = new Gate(false)
@@ -78,7 +79,7 @@ class InspectionOverTimeTask {
     }: InspectOverTimeOpts) {
         this.target = target
         this.streamrClient = streamrClient
-        this.fleetState = createOperatorFleetState(formCoordinationStreamId(target.operatorAddress))
+        this.createOperatorFleetState = createOperatorFleetState
         this.getRedundancyFactor = getRedundancyFactor
         this.sleepTimeInMsBeforeFirstInspection = sleepTimeInMsBeforeFirstInspection
         this.heartbeatTimeoutInMs = heartbeatTimeoutInMs
@@ -88,19 +89,17 @@ class InspectionOverTimeTask {
         this.findNodesForTargetGivenFleetStateFn = findNodesForTargetGivenFleetStateFn
         this.inspectTargetFn = inspectTargetFn
         this.abortSignal.addEventListener('abort', async () => {
-            await this.fleetState.destroy()
+            await this.fleetState?.destroy()
         })
     }
 
-    calculateResult(): boolean {
+    calculateResult(): boolean[] {
         const passCount = this.inspectionResults.filter((pass) => pass).length
-        const pass = passCount > this.inspectionResults.length / 2
         this.logger.info('Inspection done', {
-            pass,
             passFraction: `${passCount} / ${this.inspectionResults.length}`,
             inspectionResults: this.inspectionResults
         })
-        return pass
+        return this.inspectionResults
     }
 
     start(): void {
@@ -128,13 +127,7 @@ class InspectionOverTimeTask {
             maxInspections: this.maxInspections
         })
 
-        await this.fleetState.start()
-        this.logger.info('Waiting for fleet state')
-        await Promise.race([
-            this.fleetState.waitUntilReady(),
-            wait(this.heartbeatTimeoutInMs, this.abortSignal)
-        ])
-        this.logger.info('Wait done for fleet state', { onlineNodeCount: this.fleetState.getNodeIds().length })
+        await this.initializeNewOperatorFleetState()
 
         this.logger.info('Sleep', { timeInMs: this.sleepTimeInMsBeforeFirstInspection })
         await wait(this.sleepTimeInMsBeforeFirstInspection, this.abortSignal)
@@ -145,7 +138,7 @@ class InspectionOverTimeTask {
 
             const onlineNodeDescriptors = await this.findNodesForTargetGivenFleetStateFn(
                 this.target,
-                this.fleetState,
+                this.fleetState!,
                 this.getRedundancyFactor
             )
             this.abortSignal.throwIfAborted()
@@ -164,11 +157,35 @@ class InspectionOverTimeTask {
                 target: this.target
             })
 
-            const sleepTime = Math.max(this.inspectionIntervalInMs - timeElapsedInMs, 0)
-            this.logger.info('Sleep', { timeInMs: sleepTime })
-            await wait(sleepTime, this.abortSignal)
+            // TODO: workaround subscribe plugin in streamr-client (sometimes messages don't come thru to heartbeat stream)
+            if (this.fleetState?.getNodeIds().length === 0) {
+                this.logger.info('Destroying and re-creating fleet state')
+                this.abortSignal.throwIfAborted()
+                await this.initializeNewOperatorFleetState()
+                this.abortSignal.throwIfAborted()
+            }
+
+            if (attemptNo < this.maxInspections) {
+                const sleepTime = Math.max(this.inspectionIntervalInMs - timeElapsedInMs, 0)
+                this.logger.info('Sleep', { timeInMs: sleepTime })
+                await wait(sleepTime, this.abortSignal)
+            }
         }
 
-        this.doneGate.close()
+        this.doneGate.open()
+    }
+
+    private async initializeNewOperatorFleetState(): Promise<void> {
+        if (this.fleetState !== undefined) {
+            await this.fleetState.destroy()
+        }
+        this.fleetState = this.createOperatorFleetState(formCoordinationStreamId(this.target.operatorAddress))
+        await this.fleetState.start()
+        this.logger.info('Waiting for fleet state')
+        await Promise.race([
+            this.fleetState.waitUntilReady(),
+            wait(this.heartbeatTimeoutInMs, this.abortSignal)
+        ])
+        this.logger.info('Wait done for fleet state', { onlineNodeCount: this.fleetState.getNodeIds().length })
     }
 }
