@@ -157,15 +157,15 @@ class InspectionOverTimeTask {
                 target: this.target
             })
 
-            // TODO: workaround subscribe plugin in streamr-client (sometimes messages don't come thru to heartbeat stream)
-            if (this.fleetState?.getNodeIds().length === 0) {
-                this.logger.info('Destroying and re-creating fleet state')
-                this.abortSignal.throwIfAborted()
-                await this.initializeNewOperatorFleetState()
-                this.abortSignal.throwIfAborted()
-            }
-
             if (attemptNo < this.maxInspections) {
+                // TODO: workaround subscribe plugin in streamr-client (sometimes messages don't come thru to heartbeat stream)
+                if (this.fleetState?.getNodeIds().length === 0) {
+                    this.logger.info('Destroying and re-creating fleet state')
+                    this.abortSignal.throwIfAborted()
+                    await this.initializeNewOperatorFleetState()
+                    this.abortSignal.throwIfAborted()
+                }
+
                 const sleepTime = Math.max(this.inspectionIntervalInMs - timeElapsedInMs, 0)
                 this.logger.info('Sleep', { timeInMs: sleepTime })
                 await wait(sleepTime, this.abortSignal)
