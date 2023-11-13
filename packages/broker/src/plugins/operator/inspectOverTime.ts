@@ -96,7 +96,7 @@ class InspectionOverTimeTask {
     calculateResult(): boolean[] {
         const passCount = this.inspectionResults.filter((pass) => pass).length
         this.logger.info('Inspection done', {
-            passFraction: `${passCount} / ${this.inspectionResults.length}`,
+            passFraction: `${passCount}/${this.inspectionResults.length}`,
             inspectionResults: this.inspectionResults
         })
         return this.inspectionResults

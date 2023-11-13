@@ -42,7 +42,7 @@ export async function inspectRandomNode(
     })
 
     const pass = await result.waitForResults()
-    if (pass.some(identity)) {
+    if (!pass.some(identity)) {
         logger.info('Raise flag', { target })
         await contractFacade.flag(
             target.sponsorshipAddress,
