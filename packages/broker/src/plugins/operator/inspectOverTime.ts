@@ -40,6 +40,7 @@ export function inspectOverTime(opts: InspectOverTimeOpts): InspectionOverTimeRe
         },
         waitForResults: async () => {
             await task.waitUntilDone()
+            task.destroy()
             return task.calculateResult()
         }
     }
