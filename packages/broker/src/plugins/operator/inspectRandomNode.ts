@@ -36,8 +36,8 @@ export async function inspectRandomNode(
         getRedundancyFactor,
         sleepTimeInMsBeforeFirstInspection: 0,
         heartbeatTimeoutInMs,
-        inspectionIntervalInMs: 2 * 60 * 1000,
-        maxInspections: 3,
+        inspectionIntervalInMs: 8 * 60 * 1000,
+        maxInspections: 10,
         abortSignal
     })
 
