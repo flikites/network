@@ -1,4 +1,4 @@
-import { EthereumAddress, Logger } from '@streamr/utils'
+import { EthereumAddress, Logger, randomString } from '@streamr/utils'
 import { StreamPartAssignments } from './StreamPartAssignments'
 import { StreamrClient } from 'streamr-client'
 import { StreamPartIDUtils } from '@streamr/protocol'
@@ -6,8 +6,6 @@ import { findTarget } from './inspectionUtils'
 import { ContractFacade } from './ContractFacade'
 import { CreateOperatorFleetStateFn } from './OperatorFleetState'
 import { inspectOverTime } from './inspectOverTime'
-
-const logger = new Logger(module)
 
 export async function inspectRandomNode(
     operatorContractAddress: EthereumAddress,
@@ -20,9 +18,11 @@ export async function inspectRandomNode(
     abortSignal: AbortSignal,
     findTargetFn = findTarget,
 ): Promise<void> {
+    const traceId = randomString(6)
+    const logger = new Logger(module, { traceId })
     logger.info('Select a random operator to inspect')
 
-    const target = await findTargetFn(operatorContractAddress, contractFacade, assignments)
+    const target = await findTargetFn(operatorContractAddress, contractFacade, assignments, logger)
     if (target === undefined) {
         return
     }
@@ -38,7 +38,8 @@ export async function inspectRandomNode(
         inspectionIntervalInMs: 8 * 60 * 1000,
         maxInspections: 10,
         waitUntilDone: true,
-        abortSignal
+        abortSignal,
+        traceId
     })
 
     const results = await consumeResults()

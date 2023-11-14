@@ -1,4 +1,4 @@
-import { EthereumAddress, Logger, setAbortableTimeout } from '@streamr/utils'
+import { EthereumAddress, Logger, randomString, setAbortableTimeout } from '@streamr/utils'
 import { ContractFacade } from './ContractFacade'
 import { StreamrClient } from 'streamr-client'
 import { CreateOperatorFleetStateFn } from './OperatorFleetState'
@@ -62,7 +62,8 @@ export const reviewSuspectNode = async ({
         inspectionIntervalInMs,
         maxInspections,
         waitUntilDone: false,
-        abortSignal
+        abortSignal,
+        traceId: randomString(6)
     })
 
     const timeUntilVoteInMs = ((votingPeriod.startTime + votingPeriod.endTime) / 2) - Date.now()

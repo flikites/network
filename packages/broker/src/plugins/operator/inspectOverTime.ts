@@ -1,4 +1,4 @@
-import { AbortError, composeAbortSignals, EthereumAddress, Gate, Logger, randomString, wait } from '@streamr/utils'
+import { AbortError, composeAbortSignals, EthereumAddress, Gate, Logger, wait } from '@streamr/utils'
 import { StreamrClient } from 'streamr-client'
 import { CreateOperatorFleetStateFn, OperatorFleetState } from './OperatorFleetState'
 import {
@@ -22,6 +22,7 @@ interface InspectOverTimeOpts {
     maxInspections: number
     waitUntilDone: boolean
     abortSignal: AbortSignal
+    traceId: string
     findNodesForTargetGivenFleetStateFn?: FindNodesForTargetGivenFleetStateFn
     inspectTargetFn?: InspectTargetFn
 }
@@ -50,12 +51,12 @@ class InspectionOverTimeTask {
     private readonly abortSignal: AbortSignal
     private readonly findNodesForTargetGivenFleetStateFn: FindNodesForTargetGivenFleetStateFn
     private readonly inspectTargetFn: InspectTargetFn
+    private readonly logger: Logger
 
     private fleetState?: OperatorFleetState
     private readonly inspectionResults = new Array<boolean>()
     private readonly abortController = new AbortController()
     private readonly doneGate = new Gate(false)
-    private readonly logger = new Logger(module, { id: randomString(6) })
 
     constructor({
         target,
@@ -67,6 +68,7 @@ class InspectionOverTimeTask {
         inspectionIntervalInMs,
         maxInspections,
         abortSignal: userAbortSignal,
+        traceId,
         findNodesForTargetGivenFleetStateFn = findNodesForTargetGivenFleetState,
         inspectTargetFn = inspectTarget,
     }: InspectOverTimeOpts) {
@@ -81,6 +83,7 @@ class InspectionOverTimeTask {
         this.abortSignal = composeAbortSignals(userAbortSignal, this.abortController.signal)
         this.findNodesForTargetGivenFleetStateFn = findNodesForTargetGivenFleetStateFn
         this.inspectTargetFn = inspectTargetFn
+        this.logger = new Logger(module, { traceId })
         this.abortSignal.addEventListener('abort', async () => {
             await this.fleetState?.destroy()
         })
@@ -132,14 +135,16 @@ class InspectionOverTimeTask {
             const onlineNodeDescriptors = await this.findNodesForTargetGivenFleetStateFn(
                 this.target,
                 this.fleetState!,
-                this.getRedundancyFactor
+                this.getRedundancyFactor,
+                this.logger
             )
             this.abortSignal.throwIfAborted()
             const pass = await this.inspectTargetFn({
                 target: this.target,
                 targetPeerDescriptors: onlineNodeDescriptors,
                 streamrClient: this.streamrClient,
-                abortSignal: this.abortSignal
+                abortSignal: this.abortSignal,
+                logger: this.logger
             })
             this.inspectionResults.push(pass)
             const timeElapsedInMs = Date.now() - startTime
