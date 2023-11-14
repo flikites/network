@@ -6,7 +6,6 @@ import { findTarget } from './inspectionUtils'
 import { ContractFacade } from './ContractFacade'
 import { CreateOperatorFleetStateFn } from './OperatorFleetState'
 import { inspectOverTime } from './inspectOverTime'
-import { identity } from 'lodash'
 
 const logger = new Logger(module)
 
@@ -29,7 +28,7 @@ export async function inspectRandomNode(
     }
     logger.debug('Target established', { target })
 
-    const result = inspectOverTime({
+    const consumeResults = inspectOverTime({
         target,
         streamrClient,
         createOperatorFleetState,
@@ -38,11 +37,12 @@ export async function inspectRandomNode(
         heartbeatTimeoutInMs,
         inspectionIntervalInMs: 8 * 60 * 1000,
         maxInspections: 10,
+        waitUntilDone: true,
         abortSignal
     })
 
-    const pass = await result.waitForResults()
-    if (!pass.some(identity)) {
+    const results = await consumeResults()
+    if (!results.some((pass) => pass)) {
         logger.info('Raise flag', { target })
         await contractFacade.flag(
             target.sponsorshipAddress,

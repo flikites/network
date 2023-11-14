@@ -20,29 +20,21 @@ interface InspectOverTimeOpts {
     heartbeatTimeoutInMs: number
     inspectionIntervalInMs: number
     maxInspections: number
+    waitUntilDone: boolean
     abortSignal: AbortSignal
     findNodesForTargetGivenFleetStateFn?: FindNodesForTargetGivenFleetStateFn
     inspectTargetFn?: InspectTargetFn
 }
 
-export interface InspectionOverTimeResult {
-    getResultsImmediately: () => boolean[]
-    waitForResults: () => Promise<boolean[]>
-}
-
-export function inspectOverTime(opts: InspectOverTimeOpts): InspectionOverTimeResult {
+export function inspectOverTime(opts: InspectOverTimeOpts): () => Promise<boolean[]> {
     const task = new InspectionOverTimeTask(opts)
     task.start()
-    return {
-        getResultsImmediately: () => {
-            task.destroy()
-            return task.calculateResult()
-        },
-        waitForResults: async () => {
+    return async () => {
+        if (opts.waitUntilDone) {
             await task.waitUntilDone()
-            task.destroy()
-            return task.calculateResult()
         }
+        task.destroy()
+        return task.calculateResult()
     }
 }
 
@@ -158,10 +150,14 @@ class InspectionOverTimeTask {
                 target: this.target
             })
 
-            if (attemptNo < this.maxInspections) {
-                // TODO: workaround subscribe plugin in streamr-client (sometimes messages don't come thru to heartbeat stream)
+            if (attemptNo !== this.maxInspections) {
+                // TODO: remove when NET-1169 landed;
+                //  workaround subscribe bug in streamr-client (sometimes messages don't come thru to heartbeat stream)
                 if (this.fleetState?.getNodeIds().length === 0) {
                     this.logger.info('Destroying and re-creating fleet state')
+                    if (this.fleetState !== undefined) {
+                        await this.fleetState.destroy()
+                    }
                     this.abortSignal.throwIfAborted()
                     await this.initializeNewOperatorFleetState()
                     this.abortSignal.throwIfAborted()
@@ -177,9 +173,6 @@ class InspectionOverTimeTask {
     }
 
     private async initializeNewOperatorFleetState(): Promise<void> {
-        if (this.fleetState !== undefined) {
-            await this.fleetState.destroy()
-        }
         this.fleetState = this.createOperatorFleetState(formCoordinationStreamId(this.target.operatorAddress))
         await this.fleetState.start()
         this.logger.info('Waiting for fleet state')
