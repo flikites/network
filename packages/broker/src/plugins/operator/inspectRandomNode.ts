@@ -37,7 +37,7 @@ export async function inspectRandomNode(
         heartbeatTimeoutInMs,
         inspectionIntervalInMs: 8 * 60 * 1000,
         maxInspections: 10,
-        waitUntilDone: true,
+        waitUntilPassOrDone: true,
         abortSignal,
         traceId
     })

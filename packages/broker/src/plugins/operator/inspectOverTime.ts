@@ -20,7 +20,7 @@ interface InspectOverTimeOpts {
     heartbeatTimeoutInMs: number
     inspectionIntervalInMs: number
     maxInspections: number
-    waitUntilDone: boolean
+    waitUntilPassOrDone: boolean
     abortSignal: AbortSignal
     traceId: string
     findNodesForTargetGivenFleetStateFn?: FindNodesForTargetGivenFleetStateFn
@@ -31,8 +31,8 @@ export function inspectOverTime(opts: InspectOverTimeOpts): () => Promise<boolea
     const task = new InspectionOverTimeTask(opts)
     task.start()
     return async () => {
-        if (opts.waitUntilDone) {
-            await task.waitUntilDone()
+        if (opts.waitUntilPassOrDone) {
+            await task.waitUntilPassOrDone()
         }
         task.destroy()
         return task.calculateResult()
@@ -56,6 +56,7 @@ class InspectionOverTimeTask {
     private fleetState?: OperatorFleetState
     private readonly inspectionResults = new Array<boolean>()
     private readonly abortController = new AbortController()
+    private readonly passedSingleInspectionGate = new Gate(false)
     private readonly doneGate = new Gate(false)
 
     constructor({
@@ -107,8 +108,11 @@ class InspectionOverTimeTask {
         })
     }
 
-    waitUntilDone(): Promise<void> {
-        return this.doneGate.waitUntilOpen()
+    waitUntilPassOrDone(): Promise<void> {
+        return Promise.race([
+            this.doneGate.waitUntilOpen(),
+            this.passedSingleInspectionGate.waitUntilOpen()
+        ])
     }
 
     destroy(): void {
@@ -147,6 +151,9 @@ class InspectionOverTimeTask {
                 logger: this.logger
             })
             this.inspectionResults.push(pass)
+            if (pass) {
+                this.passedSingleInspectionGate.open()
+            }
             const timeElapsedInMs = Date.now() - startTime
             this.logger.info('Inspected target', {
                 attemptNo,

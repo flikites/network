@@ -61,7 +61,7 @@ export const reviewSuspectNode = async ({
         heartbeatTimeoutInMs,
         inspectionIntervalInMs,
         maxInspections,
-        waitUntilDone: false,
+        waitUntilPassOrDone: false,
         abortSignal,
         traceId: randomString(6)
     })
