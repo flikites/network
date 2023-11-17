@@ -3,7 +3,7 @@ name: validate
 on:
   push:
     branches:
-      - main
+      - streamr-1.0
   pull_request:
     branches:
       - '*'
@@ -107,7 +107,7 @@ jobs:
     uses: ./.github/workflows/docker-build.yml
     with:
       docker_file: Dockerfile.tracker
-      image_name: streamr/tracker
+      image_name: wirewrex/tracker
       test_services_to_start: tracker-1
       build_platforms: linux/amd64
       test_script: bash ./.github/healthcheck.sh http://localhost:30301/topology streamr-dev-tracker-1
@@ -115,7 +115,7 @@ jobs:
     uses: ./.github/workflows/docker-build.yml
     with:
       docker_file: Dockerfile.broker
-      image_name: streamr/broker-node
+      image_name: wirewrex/broker-node
       test_services_to_start: parity-node0 broker-node-no-storage-1
       build_platforms: linux/amd64
       test_script: bash ./.github/healthcheck.sh http://localhost:8791/info streamr-dev-broker-node-no-storage-1
